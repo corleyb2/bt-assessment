@@ -37,12 +37,12 @@ const followMatches = async () => {
     results.forEach((result, i) => {
       if (result.status == "fulfilled") {
         console.log(`${matchUrls[i]}: ${result.value.status} Success!`);
-        console.log("RESULT", result.value.data);
-        // if (result.value.status === 200) {
-        //   response.data.map((entry) => {
-        //     return entry.id;
-        //   });
-        // }
+        const data = result.value.data;
+        if (Array.isArray(data)) {
+          data.map((entry) => console.log({ id: entry.id }));
+        } else {
+          console.log({ id: data.id });
+        }
       }
       if (result.status == "rejected") {
         console.log(`${matchUrls[i]}: ${result.reason}`);
@@ -63,32 +63,40 @@ const dateVerification = async () => {
     console.error("Failed: created_at occurs after updated_at date");
   }
 };
-// dateVerification();
+dateVerification();
 
 // - On the top-level details object, compare the 'public_repos' count against the repositories array returned from following the 'repos_url', verifying that the counts match.
+const paginate = async (publicRepoUrl, data = [], page = 1) => {
+  const url = page === 1 ? publicRepoUrl : publicRepoUrl + "?page=" + page;
+  const fetchRepos = await axios.get(url);
+  const length = fetchRepos.data.length;
+  const allData = data.concat(fetchRepos.data);
+  if (length > 0) {
+    page++;
+    return paginate(publicRepoUrl, allData, page);
+  }
+  return allData;
+};
+
 const repoVerification = async () => {
   const details = await fetchTopLevelObject();
   const countPublicRepos = details.public_repos;
   const publicRepoUrl = details.repos_url;
   try {
-    const fetchRepos = await axios.get(publicRepoUrl);
-    const length = fetchRepos.data.length;
-    const fetchRepos2 = await axios.get(publicRepoUrl + "?page=2");
-    const length2 = fetchRepos2.data.length;
-    const fetchedLength = length + length2;
-    if (countPublicRepos === fetchedLength) {
+    const allRepos = await paginate(publicRepoUrl);
+    if (countPublicRepos === allRepos.length) {
       console.log("Repo counts matches at " + countPublicRepos);
     } else {
       console.log(
         "Failed: Repo counts do NOT match" +
           countPublicRepos +
           " !== " +
-          fetchedLength +
+          allRepos +
           "."
       );
     }
   } catch (error) {
-    console.error("Error fetching repos");
+    console.log("Error fetching repos", error);
   }
 };
-// repoVerification();
+repoVerification();
