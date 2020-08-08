@@ -4,6 +4,7 @@ const apiUrl = "https://api.github.com/orgs/boomtownroi";
 // 1. OutputData:
 // Follow all urls containing "api.github.com/orgs/BoomTownROI" in the path, and for responses with a 200 status code, retrieve and display all 'id' keys/values in the response objects. For all non-200 status codes, give some indication of the failed request. HINT: Devise a way for the end user to make sense of the id values, related to the original resource route used to retrieve the data.
 
+// get top level object
 const fetchTopLevelObject = async () => {
   try {
     const response = await axios.get(apiUrl);
@@ -17,9 +18,7 @@ const fetchTopLevelObject = async () => {
 const returnMatches = async () => {
   try {
     const response = await fetchTopLevelObject();
-    //all values into to an arr here...
     const isolatedValues = Object.values(response);
-    //then filtered into a new arr if value contains url
     const matchesArr = isolatedValues.filter((value) => {
       if (JSON.stringify(value).includes("api.github.com/orgs/BoomTownROI")) {
         return value;
@@ -27,18 +26,35 @@ const returnMatches = async () => {
     });
     return matchesArr;
   } catch (error) {
-    console.log("error", error);
+    console.error("error returning matches", error);
   }
 };
 
-returnMatches();
+// follow matches & handle status codes, successful id k/v pairs, failed error messages
+const followMatches = async () => {
+  const matchUrls = await returnMatches();
+  Promise.allSettled(matchUrls.map((url) => axios.get(url))).then((results) => {
+    results.forEach((result, i) => {
+      if (result.status == "fulfilled") {
+        console.log(`${matchUrls[i]}: ${result.value.status} Success!`);
+        console.log("RESULT", result.value.data);
+        // if (result.value.status === 200) {
+        //   response.data.map((entry) => {
+        //     return entry.id;
+        //   });
+        // }
+      }
+      if (result.status == "rejected") {
+        console.log(`${matchUrls[i]}: ${result.reason}`);
+      }
+    });
+  });
+};
+followMatches();
 
-//need api calls for results of returnMatches (containing "api.github.com/orgs/BoomTownROI")
-//for responses with a 200 status code, retrieve and display all 'id' keys/values in the response objects.
+// // 2. Perform Verifications:
 
-// 2. Perform Verifications:
-
-// - On the top-level BoomTownROI organization details object, verify that the 'updated_at' value is later than the 'created_at' date.
+// // - On the top-level BoomTownROI organization details object, verify that the 'updated_at' value is later than the 'created_at' date.
 const dateVerification = async () => {
   const details = await fetchTopLevelObject();
   if (details.updated_at > details.created_at) {
@@ -47,7 +63,32 @@ const dateVerification = async () => {
     console.error("Failed: created_at occurs after updated_at date");
   }
 };
+// dateVerification();
 
-dateVerification();
-
-// - On the top-level details object, compare the 'public_repos' count against the repositories array returned from following the 'repos_url', verifying that the counts match. HINT: The public repositories resource only returns a default limit of 30 repo objects per request.
+// - On the top-level details object, compare the 'public_repos' count against the repositories array returned from following the 'repos_url', verifying that the counts match.
+const repoVerification = async () => {
+  const details = await fetchTopLevelObject();
+  const countPublicRepos = details.public_repos;
+  const publicRepoUrl = details.repos_url;
+  try {
+    const fetchRepos = await axios.get(publicRepoUrl);
+    const length = fetchRepos.data.length;
+    const fetchRepos2 = await axios.get(publicRepoUrl + "?page=2");
+    const length2 = fetchRepos2.data.length;
+    const fetchedLength = length + length2;
+    if (countPublicRepos === fetchedLength) {
+      console.log("Repo counts matches at " + countPublicRepos);
+    } else {
+      console.log(
+        "Failed: Repo counts do NOT match" +
+          countPublicRepos +
+          " !== " +
+          fetchedLength +
+          "."
+      );
+    }
+  } catch (error) {
+    console.error("Error fetching repos");
+  }
+};
+// repoVerification();
