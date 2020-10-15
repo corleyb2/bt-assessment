@@ -18,7 +18,9 @@ const fetchTopLevelObject = async () => {
 const returnMatches = async () => {
   try {
     const response = await fetchTopLevelObject();
+    // isolate the values of the k/v pairs returned from the fetch using Object.values
     const isolatedValues = Object.values(response);
+    // filter values including the url into a new array called matchesArr
     const matchesArr = isolatedValues.filter((value) => {
       if (JSON.stringify(value).includes("api.github.com/orgs/BoomTownROI")) {
         return value;
@@ -31,17 +33,35 @@ const returnMatches = async () => {
 };
 
 // follow matches & handle status codes, successful id k/v pairs, failed error messages
+
+const paginate = async (url, data = [], page = 1) => {
+  const target = page === 1 ? url : url + "?page=" + page;
+  // starts w page 1 passed in, increments in the if conditional
+  const fetchResponse = await axios.get(target);
+  const length = fetchResponse.data.length;
+  const allData = data.concat(fetchResponse.data);
+  if (length > 0) {
+    page++;
+    return paginate(url, allData, page);
+    // while any data returns, keep looping back thru the pagination function.
+  }
+  return allData;
+  // once no more new data pulling, terminates the loop and returns the full data array
+};
+
 const followMatches = async () => {
   const matchUrls = await returnMatches();
-  Promise.allSettled(matchUrls.map((url) => axios.get(url))).then((results) => {
+  Promise.allSettled(matchUrls.map((url) => paginate(url))).then((results) => {
     results.forEach((result, i) => {
       if (result.status == "fulfilled") {
-        console.log(`${matchUrls[i]}: ${result.value.status} Success!`);
-        const data = result.value.data;
+        console.log(`${matchUrls[i]}: Success!`);
+        // result.value is an array, each index has its own id property
+        const data = result.value;
         if (Array.isArray(data)) {
-          data.map((entry) => console.log({ id: entry.id }));
+          data.map((entry) => console.log("ID: " + Number(entry.id)));
         } else {
-          console.log({ id: data.id });
+          console.log("%%%--data--%%%", data);
+          // console.log({ id: data.id });
         }
       }
       if (result.status == "rejected") {
@@ -66,18 +86,6 @@ const dateVerification = async () => {
 dateVerification();
 
 // - On the top-level details object, compare the 'public_repos' count against the repositories array returned from following the 'repos_url', verifying that the counts match.
-const paginate = async (publicRepoUrl, data = [], page = 1) => {
-  const url = page === 1 ? publicRepoUrl : publicRepoUrl + "?page=" + page;
-  const fetchRepos = await axios.get(url);
-  const length = fetchRepos.data.length;
-  const allData = data.concat(fetchRepos.data);
-  if (length > 0) {
-    page++;
-    return paginate(publicRepoUrl, allData, page);
-  }
-  return allData;
-};
-
 const repoVerification = async () => {
   const details = await fetchTopLevelObject();
   const countPublicRepos = details.public_repos;
