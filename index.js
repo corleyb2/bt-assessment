@@ -70,7 +70,6 @@ const followMatches = async () => {
     });
   });
 };
-followMatches();
 
 // // 2. Perform Verifications:
 
@@ -83,7 +82,6 @@ const dateVerification = async () => {
     console.error("Failed: created_at occurs after updated_at date");
   }
 };
-dateVerification();
 
 // - On the top-level details object, compare the 'public_repos' count against the repositories array returned from following the 'repos_url', verifying that the counts match.
 const repoVerification = async () => {
@@ -107,4 +105,11 @@ const repoVerification = async () => {
     console.log("Error fetching repos", error);
   }
 };
-repoVerification();
+
+// this isn't running in order - getting verifications before match list, but info is correct. Need to chain promises better.
+const masterFunction = async () => {
+  await followMatches();
+  await dateVerification();
+  await repoVerification();
+};
+masterFunction();
